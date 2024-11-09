@@ -1,0 +1,2 @@
+2024-11-08T11:10:06.710Z POST /api/store-project
+2024-11-08T11:10:06.710Z Request Body: {"name":"mishaal","email":"mi@gmail.com","phone":"1234567890","projectName":"wall climbing robot","description":"a remote controlled robot that uses some form of suction to stick to a wall and omnidirectional wheels to move around freely"}

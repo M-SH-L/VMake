@@ -1,0 +1,14 @@
+### Test Server
+GET http://localhost:3000/api/test
+
+### Test Parts Generation
+POST http://localhost:3000/api/generate-parts
+Content-Type: application/json
+
+{
+    "projectInfo": {
+        "name": "LED Cube",
+        "description": "A 4x4x4 LED cube that displays patterns",
+        "budget": "50"
+    }
+}
