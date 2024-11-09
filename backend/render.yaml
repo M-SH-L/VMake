@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: vmake-chatbot-backend
+    rootDir: backend
+    env: node
+    buildCommand: chmod +x render-build.sh && ./render-build.sh
+    startCommand: node src/server.js
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: NODE_ENV
+        value: production
+      - key: CORS_ORIGIN
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GOOGLE_SHEET_ID
+        sync: false
+      - key: GOOGLE_CREDENTIALS_BASE64
+        sync: false
