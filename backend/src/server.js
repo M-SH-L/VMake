@@ -2,7 +2,7 @@
 import express from 'express';
 import cors from 'cors';
 import { createAIService } from './services/ai/aiService.js';
-import { addProjectToSheet } from './services/sheets/sheets.js';
+import { addProjectToSheet, updateProjectStatusInSheet } from './services/sheets/sheets.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -10,8 +10,29 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3001;
 
-app.use(cors());
+// Enhanced CORS configuration
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  methods: ['GET', 'POST'],
+  credentials: true,
+  optionsSuccessStatus: 204
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({
+    success: false,
+    message: process.env.NODE_ENV === 'production' 
+      ? 'Internal Server Error' 
+      : err.message
+  });
+});
+
+// Rest of your server code remains the same...
 
 const aiService = createAIService('gemini');
 
