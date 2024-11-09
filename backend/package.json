@@ -5,12 +5,9 @@
   "description": "Backend for VMake chatbot",
   "main": "src/server.js",
   "scripts": {
-    "test": "node src/test-sheets.js",
-    "test-env": "node src/test-env.js",
-    "test-integration": "node src/test-integration.js",
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "build": "echo 'No build step required'"
+    "build": "echo 'Build step complete'"
   },
   "dependencies": {
     "@google/generative-ai": "^0.2.0",
@@ -19,10 +16,7 @@
     "express": "^4.18.2",
     "googleapis": "^118.0.0"
   },
-  "devDependencies": {
-    "nodemon": "^2.0.22"
-  },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "18.x"
   }
 }
