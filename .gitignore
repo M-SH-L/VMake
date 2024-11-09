@@ -3,3 +3,19 @@ node_modules/
 .DS_Store
 build/
 dist/
+
+# Dependencies
+node_modules/
+
+# Environment variables and secrets
+.env
+*.env
+apikeys.txt
+credentials.json
+
+# Build files
+build/
+dist/
+
+# System files
+.DS_Store
