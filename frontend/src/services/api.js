@@ -1,4 +1,5 @@
 import axios from 'axios';
+import config from '../config/config';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://vmake-chatbot-backend.onrender.com';
 
@@ -48,5 +49,41 @@ export const updateProjectStatus = async (data) => {
     throw error;
   }
 };
+
+// Add error interceptor for common error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response) {
+      // Server responded with a status code outside the 2xx range
+      console.error('API Error Response:', error.response.data);
+      console.error('API Error Status:', error.response.status);
+    } else if (error.request) {
+      // Request was made but no response received
+      console.error('No response received:', error.request);
+    } else {
+      // Error in setting up the request
+      console.error('Error setting up request:', error.message);
+    }
+    return Promise.reject(error);
+  }
+);
+
+// Add request interceptor for common headers or auth tokens if needed
+api.interceptors.request.use(
+  (config) => {
+    // You can add common headers here
+    // For example, if you need to add an auth token:
+    // const token = localStorage.getItem('token');
+    // if (token) {
+    //   config.headers.Authorization = `Bearer ${token}`;
+    // }
+    return config;
+  },
+  (error) => {
+    console.error('Request setup error:', error);
+    return Promise.reject(error);
+  }
+);
 
 export default api;

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
-import LandingPage from './pages/LandingPage';
-import ChatInterface from './pages/ChatInterface';
+import LandingPage from './components/LandingPage';
+import ChatInterface from './components/ChatInterface';
 
 function App() {
   return (
