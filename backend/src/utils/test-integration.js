@@ -1,6 +1,6 @@
 // backend/src/test-integration.js
-import { addProjectToSheet, getProjectsFromSheet } from './services/sheets/sheets.js';
-import { createAIService } from './services/ai/aiService.js';
+import { addProjectToSheet, getProjectsFromSheet } from '../services/sheets/sheets.js';
+import { createAIService } from '../services/ai/aiService.js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';

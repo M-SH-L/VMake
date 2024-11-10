@@ -1,5 +1,5 @@
 // backend/src/test-sheets.js
-import { addProjectToSheet, getProjectsFromSheet } from './services/sheets/sheets.js';
+import { addProjectToSheet, getProjectsFromSheet } from '../services/sheets/sheets.js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';

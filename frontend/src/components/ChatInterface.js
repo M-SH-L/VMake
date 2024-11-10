@@ -1,4 +1,3 @@
-// src/components/ChatInterface.js
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   TextField, 
@@ -18,65 +17,15 @@ import {
   TableRow
 } from '@mui/material';
 import { questions, botResponses, serviceOptions, upiDetails, currencyConfig } from '../config/chatConfig';
-import api from '../services/api';
-
-// Component for displaying parts list in a table format
-const PartsListDisplay = ({ partsList }) => {
-  if (!partsList || !partsList.parts) return null;
-
-  return (
-    <Box sx={{ mt: 2, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
-      <Typography variant="h6" gutterBottom>Recommended Parts List:</Typography>
-      
-      <TableContainer component={Paper} sx={{ mt: 2 }}>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>Component</TableCell>
-              <TableCell align="center">Quantity</TableCell>
-              <TableCell align="right">Price (₹)</TableCell>
-              <TableCell>Description</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {partsList.parts.map((part, index) => (
-              <TableRow key={index}>
-                <TableCell>{part.name} {part.optional && '(Optional)'}</TableCell>
-                <TableCell align="center">{part.quantity}</TableCell>
-                <TableCell align="right">
-                  {currencyConfig.formatAmount(part.price)}
-                </TableCell>
-                <TableCell>{part.description}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      <Typography variant="subtitle1" sx={{ mt: 2 }}>
-        Estimated Total Cost: {currencyConfig.formatAmount(partsList.totalCost)}
-      </Typography>
-
-      {partsList.additionalNotes?.length > 0 && (
-        <Box sx={{ mt: 2 }}>
-          <Typography variant="subtitle2">Additional Notes:</Typography>
-          {partsList.additionalNotes.map((note, index) => (
-            <Typography key={index} variant="body2">• {note}</Typography>
-          ))}
-        </Box>
-      )}
-    </Box>
-  );
-};
+import { processProject, storeProject, verifyPayment, updateProjectStatus } from '../services/api';
 
 // Component for displaying service options
 const ServiceOptions = ({ onSelect }) => (
-  <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
+  <Box sx={{ mt: 2, display: 'flex', gap: 2, flexDirection: 'column' }}>
     {Object.values(serviceOptions).map((option) => (
       <Card 
         key={option.id} 
         sx={{ 
-          flex: 1,
           cursor: 'pointer',
           '&:hover': { backgroundColor: '#f5f5f5' }
         }}
@@ -119,24 +68,70 @@ const PaymentDetails = ({ selectedOption }) => (
   </Box>
 );
 
-// Component for thinking animation
-const ThinkingAnimation = () => (
-  <Box sx={{ 
-    display: 'flex', 
-    alignItems: 'center', 
-    gap: 1, 
-    p: 2, 
-    bgcolor: '#f5f5f5', 
-    borderRadius: 1 
-  }}>
-    <CircularProgress size={20} />
-    <Typography variant="body1">
-      Analyzing your project...
-    </Typography>
-  </Box>
-);
+// Component for displaying parts list
+const PartsListDisplay = ({ partsList, analysis }) => {
+  if (!partsList || !partsList.parts) return null;
 
-// Main ChatInterface component
+  return (
+    <Box sx={{ mt: 2, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+      <Typography variant="h6" gutterBottom>Project Analysis & Parts List</Typography>
+      
+      {analysis && (
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="subtitle1" gutterBottom>Analysis Summary:</Typography>
+          <Typography variant="body2" gutterBottom>
+            Feasibility: {analysis.feasibility}
+          </Typography>
+          <Typography variant="body2" gutterBottom>
+            Complexity Level: {analysis.complexity}
+          </Typography>
+          <Typography variant="body2" gutterBottom>
+            Estimated Time: {analysis.estimatedTime}
+          </Typography>
+        </Box>
+      )}
+
+      <TableContainer component={Paper}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Component</TableCell>
+              <TableCell align="center">Quantity</TableCell>
+              <TableCell align="right">Price (₹)</TableCell>
+              <TableCell>Description</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {partsList.parts.map((part, index) => (
+              <TableRow key={index}>
+                <TableCell>{part.name} {part.optional && '(Optional)'}</TableCell>
+                <TableCell align="center">{part.quantity}</TableCell>
+                <TableCell align="right">
+                  {currencyConfig.formatAmount(part.price)}
+                </TableCell>
+                <TableCell>{part.description}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <Typography variant="subtitle1" sx={{ mt: 2 }}>
+        Estimated Total Cost: {currencyConfig.formatAmount(partsList.totalCost)}
+      </Typography>
+
+      {partsList.additionalNotes?.length > 0 && (
+        <Box sx={{ mt: 2 }}>
+          <Typography variant="subtitle2">Additional Notes:</Typography>
+          {partsList.additionalNotes.map((note, index) => (
+            <Typography key={index} variant="body2">• {note}</Typography>
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
+};
+
 const ChatInterface = () => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -145,19 +140,18 @@ const ChatInterface = () => {
   const [error, setError] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [partsList, setPartsList] = useState(null);
+  const [analysis, setAnalysis] = useState(null);
   const [selectedService, setSelectedService] = useState(null);
   const [awaitingPayment, setAwaitingPayment] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const messagesEndRef = useRef(null);
 
-  // Auto-scroll to bottom of chat
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   useEffect(() => {
     scrollToBottom();
-    // Show initial greeting
     if (messages.length === 0) {
       setMessages([{ 
         text: questions[0].text,
@@ -166,7 +160,6 @@ const ChatInterface = () => {
     }
   }, [messages]);
 
-  // Validate current input
   const validateInput = (input) => {
     const currentQuestion = questions[currentQuestionIndex];
     if (currentQuestion.validation) {
@@ -175,7 +168,6 @@ const ChatInterface = () => {
     return null;
   };
 
-  // Handle service selection
   const handleServiceSelection = async (service) => {
     setSelectedService(service);
     setMessages(prev => [
@@ -186,119 +178,114 @@ const ChatInterface = () => {
     setAwaitingPayment(true);
   };
 
-  // Handle payment confirmation
-  const handlePaymentConfirmation = async (transactionId) => {
-    try {
-      // Here you would typically verify the payment with your backend
-      await api.verifyPayment(transactionId);
-      
-      setMessages(prev => [
-        ...prev,
-        { text: botResponses.paymentConfirmation, sender: 'bot' }
-      ]);
-      
-      // Update project status in sheets
-      await api.updateProjectStatus({
-        ...userResponses,
-        serviceType: selectedService.id,
-        transactionId,
-        status: 'PAYMENT_COMPLETED'
-      });
-
-      setIsComplete(true);
-    } catch (error) {
-      setError('Failed to verify payment. Please try again or contact support.');
-    }
-  };
-
-  // Handle message sending
   const handleSend = async () => {
     if (!input.trim() || isAnalyzing) return;
     setError('');
 
-    // If awaiting payment confirmation
     if (awaitingPayment) {
-      handlePaymentConfirmation(input);
-      setInput('');
-      return;
-    }
+      try {
+        await verifyPayment({ transactionId: input });
+        
+        await updateProjectStatus({
+          ...userResponses,
+          serviceType: selectedService.id,
+          transactionId: input,
+          status: 'PAYMENT_COMPLETED'
+        });
 
-    // Validate input if we're still in the question phase
-    if (currentQuestionIndex < questions.length) {
-      const validationError = validateInput(input);
-      if (validationError) {
-        setError(validationError);
+        setMessages(prev => [
+          ...prev,
+          { text: input, sender: 'user' },
+          { text: botResponses.paymentConfirmation, sender: 'bot' }
+        ]);
+        setIsComplete(true);
+        setInput('');
+        return;
+      } catch (error) {
+        setError('Failed to verify payment. Please try again.');
         return;
       }
     }
 
-    // Add user's message to chat
-    const newMessages = [...messages, { text: input, sender: 'user' }];
-    setMessages(newMessages);
+    try {
+      if (currentQuestionIndex < questions.length) {
+        const validationError = validateInput(input);
+        if (validationError) {
+          setError(validationError);
+          return;
+        }
+      }
 
-    // Store user's response
-    const currentQuestion = questions[currentQuestionIndex];
-    const updatedResponses = {
-      ...userResponses,
-      [currentQuestion.id]: input
-    };
-    setUserResponses(updatedResponses);
-    setInput('');
+      const newMessages = [...messages, { text: input, sender: 'user' }];
+      setMessages(newMessages);
 
-    // If we're still collecting initial information
-    if (currentQuestionIndex < questions.length - 1) {
-      // Move to next question
-      setCurrentQuestionIndex(prev => prev + 1);
-      setTimeout(() => {
+      const currentQuestion = questions[currentQuestionIndex];
+      const updatedResponses = {
+        ...userResponses,
+        [currentQuestion.id]: input
+      };
+      setUserResponses(updatedResponses);
+      setInput('');
+
+      if (currentQuestionIndex < questions.length - 1) {
+        setCurrentQuestionIndex(prev => prev + 1);
+        setTimeout(() => {
+          setMessages(prev => [...prev, {
+            text: questions[currentQuestionIndex + 1].text,
+            sender: 'bot'
+          }]);
+        }, 500);
+      } else if (currentQuestionIndex === questions.length - 1) {
+        setIsAnalyzing(true);
         setMessages(prev => [...prev, {
-          text: questions[currentQuestionIndex + 1].text,
+          text: botResponses.analyzing,
           sender: 'bot'
         }]);
-      }, 500);
-    } 
-    // If we've collected all initial information
-    else if (currentQuestionIndex === questions.length - 1) {
-      setIsAnalyzing(true);
-      setMessages(prev => [...prev, {
-        text: botResponses.analyzing,
-        sender: 'bot',
-        isAnalyzing: true
-      }]);
 
-      try {
-        // Generate parts list and analysis
-        const result = await api.processProject(updatedResponses);
-        
-        if (result.success) {
-          setPartsList(result.partsList);
+        try {
+          const result = await processProject(updatedResponses);
           
-          // Show results and service options
-          setMessages(prev => [
-            ...prev,
-            {
-              text: botResponses.partsListGenerated,
-              sender: 'bot',
-              partsList: result.partsList
-            },
-            {
-              text: botResponses.optionsPrompt,
-              sender: 'bot',
-              showOptions: true
-            }
-          ]);
+          if (result.success && result.partsList) {
+            setPartsList(result.partsList);
+            setAnalysis(result.analysis);
+            
+            setMessages(prev => [
+              ...prev,
+              {
+                text: botResponses.partsListGenerated,
+                sender: 'bot',
+                partsList: result.partsList,
+                analysis: result.analysis
+              },
+              {
+                text: botResponses.optionsPrompt,
+                sender: 'bot',
+                showOptions: true
+              }
+            ]);
 
-          // Store project data
-          await api.storeProject({
-            ...updatedResponses,
-            partsList: result.partsList
-          });
+            await storeProject({
+              ...updatedResponses,
+              partsList: result.partsList,
+              analysis: result.analysis
+            });
+          } else {
+            throw new Error('Invalid response from server');
+          }
+        } catch (error) {
+          console.error('Error:', error);
+          setError('Failed to process your project. Please try again.');
+          setMessages(prev => [...prev, {
+            text: 'Sorry, there was an error processing your project. Please try again.',
+            sender: 'bot'
+          }]);
+        } finally {
+          setIsAnalyzing(false);
         }
-      } catch (error) {
-        console.error('Error processing project:', error);
-        setError('Failed to process your project. Please try again.');
-      } finally {
-        setIsAnalyzing(false);
       }
+    } catch (error) {
+      console.error('Error in handleSend:', error);
+      setError('An error occurred. Please try again.');
     }
   };
 
@@ -323,14 +310,29 @@ const ChatInterface = () => {
               }}
             >
               <Typography>{message.text}</Typography>
-              {message.isAnalyzing && <ThinkingAnimation />}
-              {message.partsList && <PartsListDisplay partsList={message.partsList} />}
+              {message.partsList && 
+                <PartsListDisplay 
+                  partsList={message.partsList} 
+                  analysis={message.analysis} 
+                />
+              }
               {message.showOptions && <ServiceOptions onSelect={handleServiceSelection} />}
               {message.paymentDetails && <PaymentDetails selectedOption={message.paymentDetails} />}
             </Paper>
           </Box>
         ))}
-        {isAnalyzing && <ThinkingAnimation />}
+        {isAnalyzing && (
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 1, 
+            p: 2,
+            justifyContent: 'center'
+          }}>
+            <CircularProgress size={20} />
+            <Typography>Analyzing your project...</Typography>
+          </Box>
+        )}
         <div ref={messagesEndRef} />
       </Paper>
 
@@ -340,7 +342,7 @@ const ChatInterface = () => {
         </Alert>
       )}
 
-      <Box sx={{ display: 'flex' }}>
+      <Box sx={{ display: 'flex', gap: 1 }}>
         <TextField
           fullWidth
           value={input}
@@ -354,9 +356,12 @@ const ChatInterface = () => {
                 : "Type your message here"
           }
           variant="outlined"
-          multiline
-          maxRows={3}
-          disabled={isComplete || isAnalyzing}
+          rows={1}
+          sx={{
+            '& .MuiInputBase-root': {
+              lineHeight: '1.4'
+            }
+          }}
         />
         <Button
           onClick={handleSend}
@@ -364,7 +369,7 @@ const ChatInterface = () => {
           sx={{ ml: 1 }}
           disabled={isComplete || isAnalyzing || !input.trim()}
         >
-          {isAnalyzing ? 'Processing...' : 'Send'}
+          Send
         </Button>
       </Box>
     </Box>

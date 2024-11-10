@@ -1,0 +1,62 @@
+.
+├── backend
+│   ├── credentials-base64.txt
+│   ├── credentials.json
+│   ├── logs
+│   │   └── access.log
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── render-build.sh
+│   ├── render.yaml
+│   ├── src
+│   │   ├── create-env.js
+│   │   ├── move-env.js
+│   │   ├── server.js
+│   │   ├── services
+│   │   │   ├── ai
+│   │   │   │   ├── aiService.js
+│   │   │   │   └── index.js
+│   │   │   └── sheets
+│   │   │       └── sheets.js
+│   │   ├── test-env.js
+│   │   ├── test-integration.js
+│   │   ├── test-server.js
+│   │   └── test-sheets.js
+│   └── test.http
+├── frontend
+│   ├── README.md
+│   ├── backend
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── public
+│   │   ├── _redirects
+│   │   ├── favicon.ico
+│   │   ├── index.html
+│   │   ├── logo192.png
+│   │   ├── logo512.png
+│   │   ├── manifest.json
+│   │   └── robots.txt
+│   └── src
+│       ├── App.css
+│       ├── App.js
+│       ├── App.test.js
+│       ├── components
+│       │   ├── ChatInterface.js
+│       │   └── LandingPage.js
+│       ├── config
+│       │   ├── chatConfig.js
+│       │   └── config.js
+│       ├── index.css
+│       ├── index.js
+│       ├── logo.svg
+│       ├── pages
+│       │   ├── Chat.js
+│       │   └── Home.js
+│       ├── reportWebVitals.js
+│       ├── services
+│       │   └── api.js
+│       └── setupTests.js
+├── netlify.toml
+└── project-structure.txt
+
+15 directories, 45 files

@@ -1,5 +1,4 @@
 import axios from 'axios';
-import config from '../config/config';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://vmake-chatbot-backend.onrender.com';
 
@@ -10,80 +9,54 @@ const api = axios.create({
   },
 });
 
-export const processProject = async (data) => {
+const processProject = async (data) => {
   try {
+    console.log('Sending project data to backend:', data);
     const response = await api.post('/api/process-project', data);
+    console.log('Received response from backend:', response.data);
     return response.data;
   } catch (error) {
     console.error('Error processing project:', error);
-    throw error;
+    throw new Error(error.response?.data?.message || 'Failed to process project');
   }
 };
 
-export const storeProject = async (data) => {
+const storeProject = async (data) => {
   try {
+    console.log('Storing project data:', data);
     const response = await api.post('/api/store-project', data);
     return response.data;
   } catch (error) {
     console.error('Error storing project:', error);
-    throw error;
+    throw new Error(error.response?.data?.message || 'Failed to store project');
   }
 };
 
-export const verifyPayment = async (data) => {
+const verifyPayment = async (data) => {
   try {
+    console.log('Verifying payment:', data);
     const response = await api.post('/api/verify-payment', data);
     return response.data;
   } catch (error) {
     console.error('Error verifying payment:', error);
-    throw error;
+    throw new Error(error.response?.data?.message || 'Failed to verify payment');
   }
 };
 
-export const updateProjectStatus = async (data) => {
+const updateProjectStatus = async (data) => {
   try {
+    console.log('Updating project status:', data);
     const response = await api.post('/api/update-project-status', data);
     return response.data;
   } catch (error) {
     console.error('Error updating project status:', error);
-    throw error;
+    throw new Error(error.response?.data?.message || 'Failed to update project status');
   }
 };
 
-// Add error interceptor for common error handling
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response) {
-      // Server responded with a status code outside the 2xx range
-      console.error('API Error Response:', error.response.data);
-      console.error('API Error Status:', error.response.status);
-    } else if (error.request) {
-      // Request was made but no response received
-      console.error('No response received:', error.request);
-    } else {
-      // Error in setting up the request
-      console.error('Error setting up request:', error.message);
-    }
-    return Promise.reject(error);
-  }
-);
-
-// Add request interceptor for common headers or auth tokens if needed
-api.interceptors.request.use(
-  (config) => {
-    // You can add common headers here
-    // For example, if you need to add an auth token:
-    // const token = localStorage.getItem('token');
-    // if (token) {
-    //   config.headers.Authorization = `Bearer ${token}`;
-    // }
-    return config;
-  },
-  (error) => {
-    console.error('Request setup error:', error);
-    return Promise.reject(error);
-  }
-);
-
-export default api;
+export {
+  processProject,
+  storeProject,
+  verifyPayment,
+  updateProjectStatus
+};
