@@ -26,24 +26,47 @@ class GeminiService {
   cleanJsonResponse(text) {
     try {
       logger.debug('Cleaning JSON response', { originalLength: text.length });
+      
       // Remove markdown code blocks
       let cleaned = text.replace(/```json\n|```JSON\n|```\n|```/g, '');
+      
       // Remove any leading/trailing whitespace
       cleaned = cleaned.trim();
-      // Attempt to parse and stringify to validate JSON
+      
+      // Fix common JSON formatting issues
+      cleaned = cleaned
+        // Fix missing commas in arrays
+        .replace(/"\n\s*"/g, '",\n"')
+        // Fix any trailing commas
+        .replace(/,(\s*[}\]])/g, '$1');
+      
+      logger.debug('Cleaned response:', cleaned);
+      
+      // Attempt to parse and validate JSON
       const parsed = JSON.parse(cleaned);
-      const validated = JSON.stringify(parsed);
-      logger.debug('JSON response cleaned successfully', { 
-        cleanedLength: cleaned.length,
-        isValid: true
-      });
-      return validated;
+      
+      // Validate required fields for analysis response
+      if (parsed.challenges && !Array.isArray(parsed.challenges)) {
+        throw new Error('Invalid challenges format');
+      }
+      if (parsed.recommendations && !Array.isArray(parsed.recommendations)) {
+        throw new Error('Invalid recommendations format');
+      }
+      if (parsed.safetyConsiderations && !Array.isArray(parsed.safetyConsiderations)) {
+        throw new Error('Invalid safetyConsiderations format');
+      }
+      if (parsed.prerequisiteKnowledge && !Array.isArray(parsed.prerequisiteKnowledge)) {
+        throw new Error('Invalid prerequisiteKnowledge format');
+      }
+
+      logger.debug('JSON response cleaned and validated successfully');
+      return parsed;
     } catch (error) {
       logger.error('Error cleaning JSON response:', {
         error: error.message,
         originalText: text
       });
-      throw new Error('Failed to clean and validate JSON response');
+      throw new Error(`Failed to clean and validate JSON response: ${error.message}`);
     }
   }
 
@@ -72,6 +95,8 @@ class GeminiService {
           "totalCost": number,
           "additionalNotes": ["note1", "note2"]
         }
+        
+        IMPORTANT: Ensure all arrays have proper comma separation between items.
       `;
 
       logger.debug('Sending prompt to Gemini', { promptLength: prompt.length });
@@ -83,8 +108,7 @@ class GeminiService {
       const text = response.text();
       
       logger.debug('Processing response text', { responseLength: text.length });
-      const cleanedResponse = this.cleanJsonResponse(text);
-      const parsedResponse = JSON.parse(cleanedResponse);
+      const parsedResponse = this.cleanJsonResponse(text);
 
       logger.info('Parts list generated successfully', {
         partsCount: parsedResponse.parts.length,
@@ -114,7 +138,8 @@ class GeminiService {
         Timeline: ${projectData.timeline || 'Not specified'}
         Budget: ${projectData.budget || 'Not specified'}
         
-        Provide a JSON analysis with this structure:
+        Provide a JSON analysis. Remember to include commas between all array items.
+        Required structure:
         {
           "feasibility": "HIGH|MEDIUM|LOW",
           "complexity": "BEGINNER|INTERMEDIATE|ADVANCED",
@@ -131,9 +156,19 @@ class GeminiService {
               "description": "string"
             }
           ],
-          "safetyConsiderations": ["string"],
-          "prerequisiteKnowledge": ["string"]
+          "safetyConsiderations": [
+            "consideration 1",
+            "consideration 2",
+            "consideration 3"
+          ],
+          "prerequisiteKnowledge": [
+            "knowledge 1",
+            "knowledge 2",
+            "knowledge 3"
+          ]
         }
+        
+        IMPORTANT: Ensure all arrays have proper comma separation between items.
       `;
 
       logger.debug('Sending analysis prompt to Gemini');
@@ -142,8 +177,7 @@ class GeminiService {
       const text = response.text();
       
       logger.debug('Processing analysis response');
-      const cleanedResponse = this.cleanJsonResponse(text);
-      const parsedResponse = JSON.parse(cleanedResponse);
+      const parsedResponse = this.cleanJsonResponse(text);
 
       logger.info('Project analysis completed successfully', {
         feasibility: parsedResponse.feasibility,
