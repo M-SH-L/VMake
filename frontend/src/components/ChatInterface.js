@@ -1,3 +1,5 @@
+// src/components/ChatInterface.js
+import api from '../services/api';
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   TextField, 
@@ -133,6 +135,7 @@ const PartsListDisplay = ({ partsList, analysis }) => {
 };
 
 const ChatInterface = () => {
+  // State management
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -146,6 +149,7 @@ const ChatInterface = () => {
   const [isComplete, setIsComplete] = useState(false);
   const messagesEndRef = useRef(null);
 
+  // Auto-scroll to bottom
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -160,6 +164,7 @@ const ChatInterface = () => {
     }
   }, [messages]);
 
+  // Input validation
   const validateInput = (input) => {
     const currentQuestion = questions[currentQuestionIndex];
     if (currentQuestion.validation) {
@@ -168,57 +173,166 @@ const ChatInterface = () => {
     return null;
   };
 
+  // Handle service selection
   const handleServiceSelection = async (service) => {
-    setSelectedService(service);
-    setMessages(prev => [
-      ...prev,
-      { text: `You've selected: ${service.text}`, sender: 'user' },
-      { text: botResponses.paymentPrompt, sender: 'bot', paymentDetails: service }
-    ]);
-    setAwaitingPayment(true);
+    console.log('Service selected:', service);
+    try {
+      setSelectedService(service);
+      setMessages(prev => [
+        ...prev,
+        { text: `You've selected: ${service.text}`, sender: 'user' },
+        { text: botResponses.paymentPrompt, sender: 'bot', paymentDetails: service }
+      ]);
+      setAwaitingPayment(true);
+    } catch (error) {
+      console.error('Service selection error:', error);
+      setError('Failed to process service selection');
+    }
   };
 
+  // Update the processProjectAnalysis function in ChatInterface.js
+const processProjectAnalysis = async (projectData) => {
+  console.log('Starting project analysis:', projectData);
+  try {
+    setIsAnalyzing(true);
+    setMessages(prev => [...prev, {
+      text: botResponses.analyzing,
+      sender: 'bot'
+    }]);
+
+    console.log('Sending project data to server');
+    // First check if backend is healthy
+    try {
+      await api.get('/api/health');
+    } catch (error) {
+      console.error('Backend health check failed:', error);
+      throw new Error('Server is unavailable. Please try again in a few minutes.');
+    }
+
+    const result = await processProject(projectData);
+    console.log('Received analysis result:', result);
+    
+    if (!result || !result.success) {
+      console.error('Invalid server response:', result);
+      throw new Error(result?.message || 'Invalid server response');
+    }
+
+    setPartsList(result.partsList);
+    setAnalysis(result.analysis);
+    
+    setMessages(prev => [
+      ...prev,
+      {
+        text: botResponses.partsListGenerated,
+        sender: 'bot',
+        partsList: result.partsList,
+        analysis: result.analysis
+      },
+      {
+        text: botResponses.optionsPrompt,
+        sender: 'bot',
+        showOptions: true
+      }
+    ]);
+
+    console.log('Storing project data');
+    await storeProject({
+      ...projectData,
+      partsList: result.partsList,
+      analysis: result.analysis
+    });
+
+    return true;
+  } catch (error) {
+    console.error('Project analysis failed:', error);
+    let errorMessage = 'Failed to analyze project. ';
+    
+    if (error.code === 'ECONNABORTED') {
+      errorMessage += 'Request timed out. The server might be busy, please try again.';
+    } else if (error.response?.status === 500) {
+      errorMessage += 'Server error. Please try again in a few minutes.';
+    } else {
+      errorMessage += error.message || 'Please try again.';
+    }
+    
+    setError(errorMessage);
+    setMessages(prev => [...prev, {
+      text: 'Sorry, ' + errorMessage,
+      sender: 'bot'
+    }]);
+    return false;
+  } finally {
+    setIsAnalyzing(false);
+  }
+};
+
+  // Handle payment verification
+  const handlePaymentVerification = async (transactionId) => {
+    console.log('Verifying payment:', transactionId);
+    try {
+      const verificationResult = await verifyPayment({ transactionId });
+      console.log('Payment verification result:', verificationResult);
+
+      if (!verificationResult.success) {
+        throw new Error(verificationResult.message || 'Payment verification failed');
+      }
+
+      await updateProjectStatus({
+        ...userResponses,
+        serviceType: selectedService.id,
+        transactionId,
+        status: 'PAYMENT_COMPLETED'
+      });
+
+      setMessages(prev => [
+        ...prev,
+        { text: transactionId, sender: 'user' },
+        { text: botResponses.paymentConfirmation, sender: 'bot' }
+      ]);
+      
+      setIsComplete(true);
+      return true;
+    } catch (error) {
+      console.error('Payment verification failed:', error);
+      setError('Payment verification failed: ' + (error.message || 'Please try again'));
+      return false;
+    }
+  };
+
+  // Main send handler
   const handleSend = async () => {
     if (!input.trim() || isAnalyzing) return;
     setError('');
 
-    if (awaitingPayment) {
-      try {
-        await verifyPayment({ transactionId: input });
-        
-        await updateProjectStatus({
-          ...userResponses,
-          serviceType: selectedService.id,
-          transactionId: input,
-          status: 'PAYMENT_COMPLETED'
-        });
-
-        setMessages(prev => [
-          ...prev,
-          { text: input, sender: 'user' },
-          { text: botResponses.paymentConfirmation, sender: 'bot' }
-        ]);
-        setIsComplete(true);
-        setInput('');
-        return;
-      } catch (error) {
-        setError('Failed to verify payment. Please try again.');
-        return;
-      }
-    }
+    console.log('Current state:', {
+      questionIndex: currentQuestionIndex,
+      awaitingPayment,
+      isAnalyzing,
+      input: input.trim()
+    });
 
     try {
-      if (currentQuestionIndex < questions.length) {
-        const validationError = validateInput(input);
-        if (validationError) {
-          setError(validationError);
-          return;
+      // Handle payment confirmation
+      if (awaitingPayment) {
+        const success = await handlePaymentVerification(input);
+        if (success) {
+          setInput('');
         }
+        return;
       }
 
+      // Handle regular input flow
+      const validationError = validateInput(input);
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+
+      // Add user message
       const newMessages = [...messages, { text: input, sender: 'user' }];
       setMessages(newMessages);
 
+      // Update responses
       const currentQuestion = questions[currentQuestionIndex];
       const updatedResponses = {
         ...userResponses,
@@ -227,7 +341,9 @@ const ChatInterface = () => {
       setUserResponses(updatedResponses);
       setInput('');
 
+      // Handle next step
       if (currentQuestionIndex < questions.length - 1) {
+        // Move to next question
         setCurrentQuestionIndex(prev => prev + 1);
         setTimeout(() => {
           setMessages(prev => [...prev, {
@@ -236,59 +352,16 @@ const ChatInterface = () => {
           }]);
         }, 500);
       } else if (currentQuestionIndex === questions.length - 1) {
-        setIsAnalyzing(true);
-        setMessages(prev => [...prev, {
-          text: botResponses.analyzing,
-          sender: 'bot'
-        }]);
-
-        try {
-          const result = await processProject(updatedResponses);
-          
-          if (result.success && result.partsList) {
-            setPartsList(result.partsList);
-            setAnalysis(result.analysis);
-            
-            setMessages(prev => [
-              ...prev,
-              {
-                text: botResponses.partsListGenerated,
-                sender: 'bot',
-                partsList: result.partsList,
-                analysis: result.analysis
-              },
-              {
-                text: botResponses.optionsPrompt,
-                sender: 'bot',
-                showOptions: true
-              }
-            ]);
-
-            await storeProject({
-              ...updatedResponses,
-              partsList: result.partsList,
-              analysis: result.analysis
-            });
-          } else {
-            throw new Error('Invalid response from server');
-          }
-        } catch (error) {
-          console.error('Error:', error);
-          setError('Failed to process your project. Please try again.');
-          setMessages(prev => [...prev, {
-            text: 'Sorry, there was an error processing your project. Please try again.',
-            sender: 'bot'
-          }]);
-        } finally {
-          setIsAnalyzing(false);
-        }
+        // All questions answered, process project
+        await processProjectAnalysis(updatedResponses);
       }
     } catch (error) {
       console.error('Error in handleSend:', error);
-      setError('An error occurred. Please try again.');
+      setError('An unexpected error occurred. Please try again.');
     }
   };
 
+  // Render component
   return (
     <Box sx={{ maxWidth: 800, margin: 'auto', mt: 4, p: 2 }}>
       <Paper elevation={3} sx={{ p: 2, mb: 2, height: 500, overflow: 'auto' }}>

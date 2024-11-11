@@ -1,128 +1,180 @@
+// src/services/ai/aiService.js
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import logger from '../../utils/logger.js';
 
 class GeminiService {
   constructor(apiKey) {
     if (!apiKey) {
-      logger.error('Missing API key');
+      logger.error('Gemini API key not provided');
       throw new Error('Gemini API key is required');
     }
+    logger.info('Initializing Gemini Service...');
     
-    logger.info('Initializing Gemini service');
-    this.genAI = new GoogleGenerativeAI(apiKey);
-    this.model = this.genAI.getGenerativeModel({ model: "gemini-pro" });
-    logger.info('Gemini service initialized');
+    try {
+      this.genAI = new GoogleGenerativeAI(apiKey);
+      this.model = this.genAI.getGenerativeModel({ model: "gemini-pro" });
+      logger.info('Gemini Service initialized successfully');
+    } catch (error) {
+      logger.error('Failed to initialize Gemini Service:', {
+        error: error.message,
+        stack: error.stack
+      });
+      throw error;
+    }
+  }
+
+  cleanJsonResponse(text) {
+    try {
+      logger.debug('Cleaning JSON response', { originalLength: text.length });
+      // Remove markdown code blocks
+      let cleaned = text.replace(/```json\n|```JSON\n|```\n|```/g, '');
+      // Remove any leading/trailing whitespace
+      cleaned = cleaned.trim();
+      // Attempt to parse and stringify to validate JSON
+      const parsed = JSON.parse(cleaned);
+      const validated = JSON.stringify(parsed);
+      logger.debug('JSON response cleaned successfully', { 
+        cleanedLength: cleaned.length,
+        isValid: true
+      });
+      return validated;
+    } catch (error) {
+      logger.error('Error cleaning JSON response:', {
+        error: error.message,
+        originalText: text
+      });
+      throw new Error('Failed to clean and validate JSON response');
+    }
   }
 
   async generatePartsList(projectDescription) {
     try {
-      logger.info('Starting parts list generation');
-      logger.info('Project description:', projectDescription);
+      logger.info('Starting parts list generation', {
+        descriptionLength: projectDescription.length
+      });
 
       const prompt = `
-        Generate a parts list for this electronics project. 
-        Project: ${projectDescription}
+        You are an electronics expert. Generate a detailed parts list for this project.
+        Consider all necessary components including tools and accessories.
+        Project Description: ${projectDescription}
         
-        Respond ONLY with a JSON object in this exact format:
+        Respond with ONLY a JSON object with this structure:
         {
           "parts": [
             {
-              "name": "Component name",
+              "name": "part name",
               "quantity": number,
               "price": number,
-              "description": "Component purpose",
+              "description": "brief description",
               "optional": boolean
             }
           ],
           "totalCost": number,
           "additionalNotes": ["note1", "note2"]
-        }`;
+        }
+      `;
 
-      logger.info('Sending request to Gemini');
+      logger.debug('Sending prompt to Gemini', { promptLength: prompt.length });
+
       const result = await this.model.generateContent(prompt);
+      logger.debug('Received raw response from Gemini');
+      
       const response = await result.response;
       const text = response.text();
       
-      logger.info('Received response from Gemini');
-      logger.info('Raw response:', text);
+      logger.debug('Processing response text', { responseLength: text.length });
+      const cleanedResponse = this.cleanJsonResponse(text);
+      const parsedResponse = JSON.parse(cleanedResponse);
 
-      const parsedResponse = JSON.parse(text);
-      logger.info('Successfully parsed response');
-      
+      logger.info('Parts list generated successfully', {
+        partsCount: parsedResponse.parts.length,
+        totalCost: parsedResponse.totalCost
+      });
+
       return parsedResponse;
     } catch (error) {
-      logger.error('Error in generatePartsList:', error);
+      logger.error('Failed to generate parts list:', {
+        error: error.message,
+        stack: error.stack
+      });
       throw new Error(`Parts list generation failed: ${error.message}`);
     }
   }
 
   async analyzeProject(projectData) {
     try {
-      logger.info('Starting project analysis');
-      logger.info('Project data:', projectData);
+      logger.info('Starting project analysis', {
+        projectName: projectData.projectName
+      });
 
       const prompt = `
-        Analyze this electronics project and provide insights.
-        Project: ${JSON.stringify(projectData)}
+        You are an electronics expert analyzing this project:
+        Name: ${projectData.projectName}
+        Description: ${projectData.description}
+        Timeline: ${projectData.timeline || 'Not specified'}
+        Budget: ${projectData.budget || 'Not specified'}
         
-        Respond ONLY with a JSON object in this exact format:
+        Provide a JSON analysis with this structure:
         {
           "feasibility": "HIGH|MEDIUM|LOW",
           "complexity": "BEGINNER|INTERMEDIATE|ADVANCED",
           "estimatedTime": "string",
           "challenges": [
             {
-              "type": "string",
+              "type": "TECHNICAL|SAFETY|IMPLEMENTATION",
               "description": "string"
             }
           ],
           "recommendations": [
             {
-              "category": "string",
+              "category": "SAFETY|IMPLEMENTATION|LEARNING",
               "description": "string"
             }
           ],
-          "safetyConsiderations": [
-            "string"
-          ]
-        }`;
+          "safetyConsiderations": ["string"],
+          "prerequisiteKnowledge": ["string"]
+        }
+      `;
 
-      logger.info('Sending request to Gemini');
+      logger.debug('Sending analysis prompt to Gemini');
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
       
-      logger.info('Received response from Gemini');
-      logger.info('Raw response:', text);
+      logger.debug('Processing analysis response');
+      const cleanedResponse = this.cleanJsonResponse(text);
+      const parsedResponse = JSON.parse(cleanedResponse);
 
-      const parsedResponse = JSON.parse(text);
-      logger.info('Successfully parsed response');
-      
+      logger.info('Project analysis completed successfully', {
+        feasibility: parsedResponse.feasibility,
+        complexity: parsedResponse.complexity
+      });
+
       return parsedResponse;
     } catch (error) {
-      logger.error('Error in analyzeProject:', error);
+      logger.error('Project analysis failed:', {
+        error: error.message,
+        stack: error.stack
+      });
       throw new Error(`Project analysis failed: ${error.message}`);
     }
   }
 }
 
 export function createAIService(provider = 'gemini') {
-  try {
-    logger.info('Creating AI service');
-    const apiKey = process.env.GEMINI_API_KEY;
-    
-    if (!apiKey) {
-      throw new Error('GEMINI_API_KEY environment variable is not set');
-    }
-
-    switch (provider) {
-      case 'gemini':
-        return new GeminiService(apiKey);
-      default:
-        throw new Error(`Unsupported AI provider: ${provider}`);
-    }
-  } catch (error) {
-    logger.error('Error creating AI service:', error);
-    throw error;
+  const apiKey = process.env.GEMINI_API_KEY;
+  logger.info('Creating AI service', { provider });
+  
+  if (!apiKey) {
+    logger.error('GEMINI_API_KEY not found in environment variables');
+    throw new Error('GEMINI_API_KEY is not configured');
+  }
+  
+  switch (provider) {
+    case 'gemini':
+      return new GeminiService(apiKey);
+    default:
+      logger.error('Unsupported AI provider specified', { provider });
+      throw new Error(`Unsupported AI provider: ${provider}`);
   }
 }
